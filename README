@@ -1,0 +1,2 @@
+This is basically a clone of socketstat (specifically the ss -tulnp behavior), but for Debian GNU/Hurd
+It uses tcc for now, nice light compiler
