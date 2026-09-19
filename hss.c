@@ -32,9 +32,153 @@
 #define DEFAULT_PROC_LIMIT 3
 #define MAX_ETH_IPS 10
 #define MAX_DISPLAY_IPS 3
+#define MAX_PORTS 256
+#define CONFIG_PATH "~/.config/.hssrc"
+#define MAX_SERVICE_NAME_LEN 20
+#define MAX_RANGE_SIZE 20
 
-static int initial_ports[] = {22, 80, 443, 21, 3306, 5432, 6379, 8080, 1337};
-#define INITIAL_PORTS_LEN (sizeof(initial_ports) / sizeof(initial_ports[0]))
+static const int common_modern_ports[] = {
+    8080, 8443, 3000, 5000, 8000, 8888, 9000, 9090, 1337, 27017
+};
+#define NUM_MODERN_PORTS (sizeof(common_modern_ports) / sizeof(common_modern_ports[0]))
+
+struct port_entry {
+    int port;
+    char service_name[64];
+};
+
+static int is_common_port(int port) {
+    if (port >= 1 && port <= 1023) return 1;
+    for (size_t i = 0; i < NUM_MODERN_PORTS; i++) {
+        if (common_modern_ports[i] == port) return 1;
+    }
+    return 0;
+}
+
+static int get_common_modern_ports(struct port_entry *entries, int max_entries) {
+    int count = 0;
+    for (size_t i = 0; i < NUM_MODERN_PORTS && count < max_entries; i++) {
+        entries[count].port = common_modern_ports[i];
+        snprintf(entries[count].service_name, sizeof(entries[count].service_name),
+                 "%d", common_modern_ports[i]);
+        count++;
+    }
+    return count;
+}
+
+static int parse_etc_services(struct port_entry *entries, int max_entries) {
+    FILE *f = fopen("/etc/services", "r");
+    if (!f) return 0;
+    char line[256];
+    int count = 0;
+    while (fgets(line, sizeof(line), f) && count < max_entries) {
+        if (line[0] == '#' || line[0] == '\n') continue;
+        char name[64];
+        int port_start, port_end;
+        char proto[16];
+        if (sscanf(line, "%63s %d-%d/%15s", name, &port_start, &port_end, proto) == 4) {
+            if (strstr(proto, "6")) continue;
+            if (port_end - port_start + 1 > MAX_RANGE_SIZE) {
+                port_end = port_start + MAX_RANGE_SIZE - 1;
+            }
+            for (int p = port_start; p <= port_end && count < max_entries; p++) {
+                if (p > 0 && p < 65536 && is_common_port(p)) {
+                    entries[count].port = p;
+                    if (strlen(name) > MAX_SERVICE_NAME_LEN) {
+                        strncpy(entries[count].service_name, name, MAX_SERVICE_NAME_LEN - 3);
+                        entries[count].service_name[MAX_SERVICE_NAME_LEN - 3] = '.';
+                        entries[count].service_name[MAX_SERVICE_NAME_LEN - 2] = '.';
+                        entries[count].service_name[MAX_SERVICE_NAME_LEN - 1] = '.';
+                        entries[count].service_name[MAX_SERVICE_NAME_LEN] = '\0';
+                    } else {
+                        strncpy(entries[count].service_name, name, MAX_SERVICE_NAME_LEN);
+                        entries[count].service_name[MAX_SERVICE_NAME_LEN] = '\0';
+                    }
+                    count++;
+                }
+            }
+        } else if (sscanf(line, "%63s %d/%15s", name, &port_start, proto) == 3) {
+            if (strstr(proto, "6")) continue;
+            if (port_start > 0 && port_start < 65536 && is_common_port(port_start)) {
+                entries[count].port = port_start;
+                if (strlen(name) > MAX_SERVICE_NAME_LEN) {
+                    strncpy(entries[count].service_name, name, MAX_SERVICE_NAME_LEN - 3);
+                    entries[count].service_name[MAX_SERVICE_NAME_LEN - 3] = '.';
+                    entries[count].service_name[MAX_SERVICE_NAME_LEN - 2] = '.';
+                    entries[count].service_name[MAX_SERVICE_NAME_LEN - 1] = '.';
+                    entries[count].service_name[MAX_SERVICE_NAME_LEN] = '\0';
+                } else {
+                    strncpy(entries[count].service_name, name, MAX_SERVICE_NAME_LEN);
+                    entries[count].service_name[MAX_SERVICE_NAME_LEN] = '\0';
+                }
+                count++;
+            }
+        }
+    }
+    fclose(f);
+    return count;
+}
+
+static int parse_config_file(const char *path, struct port_entry *entries, int max_entries) {
+    char expanded_path[256];
+    if (path[0] == '~') {
+        const char *home = getenv("HOME");
+        if (!home) return 0;
+        snprintf(expanded_path, sizeof(expanded_path), "%s%s", home, path + 1);
+        path = expanded_path;
+    }
+    FILE *f = fopen(path, "r");
+    if (!f) return 0;
+    char line[256];
+    int count = 0;
+    while (fgets(line, sizeof(line), f) && count < max_entries) {
+        if (line[0] == '#' || line[0] == '\n') continue;
+        int port = atoi(line);
+        if (port > 0 && port < 65536) {
+            entries[count].port = port;
+            snprintf(entries[count].service_name, sizeof(entries[count].service_name), "custom-%d", port);
+            count++;
+        }
+    }
+    fclose(f);
+    return count;
+}
+
+static int merge_port_lists(struct port_entry *etc_services, int num_etc,
+                            struct port_entry *modern, int num_modern,
+                            struct port_entry *custom, int num_custom,
+                            struct port_entry *merged, int max_merged) {
+    int count = 0;
+    int seen[65536] = {0};
+    for (int i = 0; i < num_etc && count < max_merged; i++) {
+        if (!seen[etc_services[i].port]) {
+            merged[count++] = etc_services[i];
+            seen[etc_services[i].port] = 1;
+        }
+    }
+    for (int i = 0; i < num_modern && count < max_merged; i++) {
+        if (!seen[modern[i].port]) {
+            merged[count++] = modern[i];
+            seen[modern[i].port] = 1;
+        }
+    }
+    for (int i = 0; i < num_custom && count < max_merged; i++) {
+        if (!seen[custom[i].port]) {
+            merged[count++] = custom[i];
+            seen[custom[i].port] = 1;
+        }
+    }
+    for (int i = 0; i < count - 1; i++) {
+        for (int j = i + 1; j < count; j++) {
+            if (merged[j].port < merged[i].port) {
+                struct port_entry tmp = merged[i];
+                merged[i] = merged[j];
+                merged[j] = tmp;
+            }
+        }
+    }
+    return count;
+}
 
 static int get_all_ethernet_ips(char ips[][INET_ADDRSTRLEN], int max_ips) {
     struct ifaddrs *ifaddr, *ifa;
@@ -195,9 +339,18 @@ int main(int argc, char *argv[]) {
     file_t sock_port = file_name_lookup(_SERVERS_SOCKET "/2", 0, 0);
     if (sock_port == MACH_PORT_NULL) fprintf(stderr, "hss: Warning - IPv4 socket translator not responding\n");
     else mach_port_deallocate(mach_task_self(), sock_port);
+    struct port_entry etc_services[MAX_PORTS];
+    int num_etc = parse_etc_services(etc_services, MAX_PORTS);
+    struct port_entry modern[MAX_PORTS];
+    int num_modern = get_common_modern_ports(modern, MAX_PORTS);
+    struct port_entry custom[MAX_PORTS];
+    int num_custom = parse_config_file(CONFIG_PATH, custom, MAX_PORTS);
+    struct port_entry merged[MAX_PORTS];
+    int num_merged = merge_port_lists(etc_services, num_etc, modern, num_modern,
+                                       custom, num_custom, merged, MAX_PORTS);
     printf("%-8s %-12s %-30s %s\n", "Netid", "State", "Local Address:Port", "Process");
-    for (size_t i = 0; i < INITIAL_PORTS_LEN; i++) {
-        int port = initial_ports[i];
+    for (int i = 0; i < num_merged; i++) {
+        int port = merged[i].port;
         if (!probe_port(target, port, local_addr, sizeof(local_addr), eth_ips, num_eth_ips)) continue;
         find_pids_for_port_hurd(proc_server, port, status, sizeof(status), proc_limit);
         printf("%-8s %-12s %-30s %s\n", "tcp", "LISTEN", local_addr, status);
