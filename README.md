@@ -12,7 +12,25 @@ On monolithic kernels like Linux, `ss` queries a centralized kernel-space socket
 - **Low-level Mach/Hurd inspection**: Crawls the Mach process server using `proc_getallpids` and `proc_getprocargs`
 - **Zero memory leaks**: Explicit `vm_deallocate` for all Mach page memory
 - **Fast runtime**: Resolves the entire user-space distributed map in ~0.320 seconds
+- **Compact design**: Full functionality in ~210 lines of C
 - **Dual compiler support**: Compiles with both `tcc` (rapid development) and `gcc` (production)
+
+## Design
+
+The entire implementation fits in ~210 lines of C, built around a simple pipeline:
+
+1. **Gather** — Candidate ports are collected from three sources in priority order:
+   common services from `/etc/services` (ports 1–1023 plus curated modern ports),
+   a built-in modern-port list, and optional user ports from `~/.config/.hssrc`
+   (one port per line).
+2. **Deduplicate & sort** — A single `add_entry()` helper inserts each candidate in
+   sorted order while skipping duplicates — no separate merge or sort passes.
+3. **Probe** — Each candidate is tested with a non-blocking `connect()` and a
+   2-second `select()` timeout. Localhost listeners are cross-checked against the
+   machine's ethernet IPs for an `ss`-style multi-address display.
+4. **Resolve** — Owning processes are identified by crawling the Mach proc server
+   (`proc_getallpids` / `proc_getprocargs`) and heuristically matching command
+   lines to ports.
 
 ## Sample Output
 
@@ -35,6 +53,8 @@ hss [target] [options]
 | `target` | Host to scan (default: localhost) |
 | `--all-processes` | Show all processes for each port |
 | `--process-limit=N` | Limit processes shown per port (default: 3) |
+
+Add extra ports to scan by listing them in `~/.config/.hssrc`, one per line.
 
 ### Examples
 
