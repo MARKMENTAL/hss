@@ -138,12 +138,19 @@ static int probe_port(const char *host, int port, char *out, size_t len, char (*
     return 1;
 }
 
+static int has_port_token(const char *args, const char *needle) {
+    size_t n = strlen(needle);
+    for (const char *p = args; (p = strstr(p, needle)); p++)
+        if ((p == args || p[-1] < '0' || p[-1] > '9') && (p[n] < '0' || p[n] > '9')) return 1;
+    return 0;
+}
+
 static int is_process_match(int port, const char *args, const char *needle) {
     if (port == 22 && strstr(args, "sshd")) return 1;
     if ((port == 80 || port == 443) && (strstr(args, "httpd") || strstr(args, "apache") || strstr(args, "nginx") || strstr(args, "lighttpd"))) return 1;
     if ((port == 21 && strstr(args, "ftp")) || (port == 5432 && strstr(args, "postgres")) || (port == 6379 && strstr(args, "redis"))) return 1;
     if (port == 3306 && (strstr(args, "mysql") || strstr(args, "mariadb"))) return 1;
-    return (strstr(args, "python") || strstr(args, "node") || strstr(args, "java") || strstr(args, "ruby")) && strstr(args, needle);
+    return (strstr(args, "python") || strstr(args, "node") || strstr(args, "java") || strstr(args, "ruby")) && has_port_token(args, needle);
 }
 
 static void find_pids_for_port_hurd(process_t proc, int port, char *out, size_t len, int max_procs) {
