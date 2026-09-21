@@ -1,0 +1,17 @@
+Source: hurd-socket-stat
+Section: utils
+Priority: optional
+Maintainer: Mark Robillard Jr <marky611@gmail.com>
+Build-Depends: debhelper-compat (= 13)
+Standards-Version: 4.7.0
+Homepage: https://github.com/MARKMENTAL/hss
+
+Package: hurd-socket-stat
+Architecture: hurd-any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: Socket statistics utility for the GNU Hurd (hss)
+ 'hss' is a dual-acronym utility standing for both Hurd Socket Stat 
+ and Heuristic Socket Stat. It acts as a practical, heuristics-based 
+ socket table emulator designed specifically for the decentralized 
+ architecture of the GNU/Hurd operating system.
+

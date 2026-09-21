@@ -90,9 +90,25 @@ gcc -Wall -Wextra -O2 -o hss hss.c
 tcc -run hss.c
 ```
 
-## Debian Package Target
+## Debian Package
 
-Planned for official inclusion with a standard `debian/` directory targeting `Architecture: hurd-any`.
+A standard `debian/` directory is included, targeting `Architecture: hurd-any`.
+
+### Build Dependencies (on Debian GNU/Hurd)
+
+```bash
+sudo apt install build-essential hurd-dev dpkg-dev debhelper
+```
+
+### Building
+
+```bash
+./build.sh
+```
+
+This builds both source and binary packages via `dpkg-buildpackage -us -uc`
+and collects the resulting artifacts (`.deb`, `.buildinfo`, `.changes`) into
+`dist/`.
 
 ## License
 

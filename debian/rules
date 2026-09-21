@@ -1,0 +1,11 @@
+#!/usr/bin/make -f
+%:
+	dh $@
+
+override_dh_auto_build:
+	gcc -Wall -Wextra -g -O2 -o hss hss.c
+
+override_dh_auto_install:
+	install -D -m 0755 hss debian/hurd-socket-stat/usr/bin/hss
+	install -D -m 0644 LICENSE debian/hurd-socket-stat/usr/share/doc/hurd-socket-stat/LICENSE
+	install -D -m 0644 debian/copyright debian/hurd-socket-stat/usr/share/doc/hurd-socket-stat/copyright
