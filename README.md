@@ -35,7 +35,7 @@ The entire implementation fits in ~210 lines of C, built around a simple pipelin
 ## Documentation
 
 Detailed function breakdowns, Mach/Hurd concepts, and code explanations are
-in [`docs/INDEX.md`](docs/INDEX.md).
+in [`docs/index.md`](docs/index.md).
 
 ## Sample Output
 
