@@ -1,3 +1,11 @@
+hurd-socket-stat (0.1.1) unstable; urgency=low
+
+  * Fix: skip process lookup for remote targets to avoid showing local PIDs
+    for remote ports. Use "n/a" placeholder instead.
+  * Add is_local_target() helper; guard getproc() and hss_find_pids().
+
+ -- Mark Robillard Jr <marky611@gmail.com>  Mon, 21 Sep 2026 09:00:00 +0000
+
 hurd-socket-stat (0.1) unstable; urgency=low
 
   * Initial release.

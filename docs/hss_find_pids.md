@@ -2,6 +2,10 @@
 
 **Source:** `hss-proc.h:27`
 
+> **Note:** This function only runs when the target is local (`localhost`,
+> `127.0.0.1`, or one of the machine's own IPs). For remote targets, `hss`
+> skips process lookup entirely and reports `users:(("n/a",pid=0))`.
+
 Finds the process(es) that own a given listening port, using heuristic
 command-line matching against the Mach proc server.
 

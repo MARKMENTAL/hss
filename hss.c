@@ -19,6 +19,13 @@ static void print_help(void) {
            "processes by inspecting the Mach proc server.\n", APP_NAME);
 }
 
+static int is_local_target(const char *target, char (*ips)[INET_ADDRSTRLEN], int nips) {
+    if (!strcmp(target, "localhost") || !strcmp(target, "127.0.0.1")) return 1;
+    for (int i = 0; i < nips; i++)
+        if (!strcmp(target, ips[i])) return 1;
+    return 0;
+}
+
 int main(int argc, char *argv[]) {
 
     const char *target = (argc > 1) ? argv[1] : "localhost";
@@ -64,12 +71,16 @@ int main(int argc, char *argv[]) {
     /* getproc() returns a Mach port handle to the Hurd process server — a
      * userspace translator, not a kernel syscall. Used below to enumerate
      * every running process. */
-    process_t proc_server = getproc();
+    int local = is_local_target(target, eth_ips, num_eth_ips);
+    process_t proc_server = local ? getproc() : MACH_PORT_NULL;
 
-    if (proc_server == MACH_PORT_NULL) {
+    if (local && proc_server == MACH_PORT_NULL) {
         fprintf(stderr, "%s: Error fetching Hurd proc server port via getproc()\n", APP_NAME);
         return 1;
     }
+
+    if (!local)
+        fprintf(stderr, "%s: process lookup only available for local targets\n", APP_NAME);
 
     printf("%-8s %-12s %-30s %s\n", "Netid", "State", "Local Address:Port", "Process");
 
@@ -85,7 +96,10 @@ int main(int argc, char *argv[]) {
             continue;
         }
 
-        hss_find_pids(proc_server, ports[i].port, proc_status, sizeof(proc_status), proc_limit);
+        if (local && proc_server != MACH_PORT_NULL)
+            hss_find_pids(proc_server, ports[i].port, proc_status, sizeof(proc_status), proc_limit);
+        else
+            snprintf(proc_status, sizeof(proc_status), "users:((\"n/a\",pid=0))");
         printf("%-8s %-12s %-30s %s\n", "tcp", "LISTEN", local_addr, proc_status);
     }
 
