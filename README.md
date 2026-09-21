@@ -32,6 +32,11 @@ The entire implementation fits in ~210 lines of C, built around a simple pipelin
    (`proc_getallpids` / `proc_getprocargs`) and heuristically matching command
    lines to ports.
 
+## Documentation
+
+Detailed function breakdowns, Mach/Hurd concepts, and code explanations are
+in [`docs/INDEX.md`](docs/INDEX.md).
+
 ## Sample Output
 
 ```
